@@ -32,14 +32,32 @@ public class OrePopulator extends BlockPopulator {
     }
 
     private void generateOre(LimitedRegion region, Random random, Material mat, int amount, int minY, int maxY) {
-        for (int i = 0; i < amount; i++) {
-            int x = random.nextInt(16);
-            int z = random.nextInt(16);
-            int y = random.nextInt(maxY - minY) + minY;
+    for (int i = 0; i < amount; i++) {
+        // Coordonnées relatives (0 à 15)
+        // On utilise l'aléatoire pour disperser les minerais dans le chunk
+        int x = random.nextInt(16);
+        int z = random.nextInt(16);
+        
+        // Calcul de la hauteur
+        int range = Math.max(1, maxY - minY);
+        int y = random.nextInt(range) + minY;
+        
+        // Sécurité pour ne pas sortir des limites verticales du monde
+        y = Math.max(-64, Math.min(319, y));
+
+        try {
+            // Dans LimitedRegion, getType(x, y, z) avec x et z entre 0 et 15 
+            // cible automatiquement le chunk en cours de génération.
             Material current = region.getType(x, y, z);
+            
             if (current == Material.STONE || current == Material.DEEPSLATE || current == Material.TUFF) {
                 region.setType(x, y, z, mat);
             }
+        } catch (IndexOutOfBoundsException | IllegalArgumentException e) {
+            // Si jamais on dépasse (ne devrait pas arriver avec 0-15), 
+            // on ignore pour éviter de faire crash le serveur.
+            continue; 
         }
     }
+  }
 }
