@@ -60,6 +60,7 @@ public class WorldCommands implements CommandExecutor {
         sender.sendMessage(" ");
         sender.sendMessage("§6/rw help §8» §7Affiche ce menu d'aide.");
         sender.sendMessage("§6/rw create <nom> [flat] §8» §7Créer ou remplacer un monde.");
+        sender.sendMessage("§6/rw delete <nom> §8» §cSupprimer définitivement un monde.");
         sender.sendMessage("§6/rw confirm §8» §aConfirmer l'écrasement d'un monde.");
         sender.sendMessage("§6/rw cancel §8» §cAnnuler la création en cours.");
         sender.sendMessage("§6/rw list §8» §7Afficher la liste des mondes chargés.");
