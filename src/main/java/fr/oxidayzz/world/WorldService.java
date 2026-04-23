@@ -153,4 +153,47 @@ public class WorldService {
         }
         return true;
     }
+
+    public void scanOres(Player player, int radius) {
+    player.sendMessage("§e[Scan] §7Analyse de la densité des minerais en cours...");
+    
+    Map<Material, Integer> counts = new HashMap<>();
+    counts.put(Material.DIAMOND_ORE, 0);
+    counts.put(Material.DEEPSLATE_DIAMOND_ORE, 0);
+    counts.put(Material.GOLD_ORE, 0);
+    counts.put(Material.DEEPSLATE_GOLD_ORE, 0);
+    counts.put(Material.IRON_ORE, 0);
+    counts.put(Material.DEEPSLATE_IRON_ORE, 0);
+
+    Chunk center = player.getLocation().getChunk();
+    int totalChunks = 0;
+
+    for (int x = -radius; x <= radius; x++) {
+        for (int z = -radius; z <= radius; z++) {
+            Chunk chunk = player.getWorld().getChunkAt(center.getX() + x, center.getZ() + z);
+            totalChunks++;
+            
+            // On scanne les couches où tes minerais spawnent (-64 à 100)
+            for (int bx = 0; bx < 16; bx++) {
+                for (int bz = 0; bz < 16; bz++) {
+                    for (int by = -64; by < 100; by++) {
+                        Material type = chunk.getBlock(bx, by, bz).getType();
+                        if (counts.containsKey(type)) {
+                            counts.put(type, counts.get(type) + 1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    player.sendMessage("§8--- §6Résultats du Scan (§f" + totalChunks + " chunks§6) §8---");
+    int diamonds = counts.get(Material.DIAMOND_ORE) + counts.get(Material.DEEPSLATE_DIAMOND_ORE);
+    int gold = counts.get(Material.GOLD_ORE) + counts.get(Material.DEEPSLATE_GOLD_ORE);
+    int iron = counts.get(Material.IRON_ORE) + counts.get(Material.DEEPSLATE_IRON_ORE);
+
+    player.sendMessage("§b♦ Diamants: §f" + diamonds + " §7(Moyenne: " + (diamonds/totalChunks) + "/chunk)");
+    player.sendMessage("§e● Or: §f" + gold + " §7(Moyenne: " + (gold/totalChunks) + "/chunk)");
+    player.sendMessage("§f■ Fer: §f" + iron + " §7(Moyenne: " + (iron/totalChunks) + "/chunk)");
+  }
 }

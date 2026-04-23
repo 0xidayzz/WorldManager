@@ -80,6 +80,23 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
                 player.sendMessage("§6§lMONDES:");
                 for (World w : Bukkit.getWorlds()) player.sendMessage(" §8• §f" + w.getName());
                 break;
+
+            case "scan":
+              if (args.length >= 2) {
+                try {
+                  int radius = Integer.parseInt(args[1]);
+                  if (radius > 5) {
+                    player.sendMessage("§cRayon trop grand (max 5) pour éviter les lags.");
+                    return true;
+                  }   
+                plugin.getWorldService().scanOres(player, radius);
+                } catch (NumberFormatException e) {
+                  player.sendMessage("§cUsage: /rw scan <rayon>");
+                }
+                } else {
+                  player.sendMessage("§cUsage: /rw scan <rayon>");
+                }
+                break;    
         }
         return true;
     }
