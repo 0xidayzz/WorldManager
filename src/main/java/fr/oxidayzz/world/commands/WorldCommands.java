@@ -19,7 +19,7 @@ import java.util.List;
 public class WorldCommands implements CommandExecutor, TabCompleter {
 
     private final WorldManager plugin;
-    private final List<String> subCommands = Arrays.asList("create", "delete", "tp", "confirm", "cancel", "list");
+    private final List<String> subCommands = Arrays.asList("create", "delete", "tp", "confirm", "cancel", "list", "scan", "pregen");
 
     public WorldCommands(WorldManager plugin) {
         this.plugin = plugin;
@@ -28,36 +28,28 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) return true;
-
         if (args.length == 0) return true;
 
         switch (args[0].toLowerCase()) {
             case "create":
-                // Usage: /rw create <nom> <biomes|flat> <d%> <g%> <i%> <l%> <e%> <r%> [nostruct]
                 if (args.length >= 9) {
                     try {
-                        String name = args[1];
-                        String biomes = args[2];
-                        int d = Integer.parseInt(args[3]);
-                        int g = Integer.parseInt(args[4]);
-                        int i = Integer.parseInt(args[5]);
-                        int l = Integer.parseInt(args[6]);
-                        int e = Integer.parseInt(args[7]);
-                        int r = Integer.parseInt(args[8]);
-                        
-                        boolean noStruct = false;
-                        if (args.length == 10 && args[9].equalsIgnoreCase("nostruct")) {
-                            noStruct = true;
-                        }
-
-                        plugin.getWorldService().askConfirmation(player, name, biomes.equalsIgnoreCase("flat"), 
-                                                               biomes, d, g, i, l, e, r, noStruct);
-                    } catch (NumberFormatException ex) {
-                        player.sendMessage("§cErreur: Les taux de minerais doivent être des nombres.");
-                    }
-                } else {
-                    player.sendMessage("§cUsage: /rw create <nom> <biomes> <D%> <G%> <I%> <L%> <E%> <R%> [nostruct]");
+                        plugin.getWorldService().askConfirmation(player, args[1], args[2].equalsIgnoreCase("flat"), 
+                                args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]), Integer.parseInt(args[5]), 
+                                Integer.parseInt(args[6]), Integer.parseInt(args[7]), Integer.parseInt(args[8]), 
+                                (args.length == 10 && args[9].equalsIgnoreCase("nostruct")));
+                    } catch (Exception e) { player.sendMessage("§cUsage: /rw create <nom> <biomes> <D%> <G%> <I%> <L%> <E%> <R%> [nostruct]"); }
                 }
+                break;
+
+            case "pregen":
+                if (args.length >= 3) {
+                    plugin.getWorldService().pregenWorld(player, args[1], Integer.parseInt(args[2]));
+                } else player.sendMessage("§c/rw pregen <monde> <rayon>");
+                break;
+
+            case "scan":
+                plugin.getWorldService().scanOres(player, args.length >= 2 ? Integer.parseInt(args[1]) : 1);
                 break;
 
             case "tp":
@@ -68,35 +60,12 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
                 if (args.length >= 2) plugin.getWorldService().askDeleteConfirmation(player, args[1]);
                 break;
 
-            case "confirm":
-                plugin.getWorldService().confirm(player);
-                break;
-
-            case "cancel":
-                plugin.getWorldService().cancel(player);
-                break;
-
+            case "confirm": plugin.getWorldService().confirm(player); break;
+            case "cancel": plugin.getWorldService().cancel(player); break;
             case "list":
-                player.sendMessage("§6§lMONDES:");
-                for (World w : Bukkit.getWorlds()) player.sendMessage(" §8• §f" + w.getName());
+                player.sendMessage("§6Mondes:");
+                for (World w : Bukkit.getWorlds()) player.sendMessage("§8• §f" + w.getName());
                 break;
-
-            case "scan":
-              if (args.length >= 2) {
-                try {
-                  int radius = Integer.parseInt(args[1]);
-                  if (radius > 5) {
-                    player.sendMessage("§cRayon trop grand (max 5) pour éviter les lags.");
-                    return true;
-                  }   
-                plugin.getWorldService().scanOres(player, radius);
-                } catch (NumberFormatException e) {
-                  player.sendMessage("§cUsage: /rw scan <rayon>");
-                }
-                } else {
-                  player.sendMessage("§cUsage: /rw scan <rayon>");
-                }
-                break;    
         }
         return true;
     }
@@ -106,15 +75,14 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
             StringUtil.copyPartialMatches(args[0], subCommands, completions);
+        } else if (args.length == 2 && (args[0].equalsIgnoreCase("tp") || args[0].equalsIgnoreCase("delete") || args[0].equalsIgnoreCase("pregen"))) {
+            List<String> worlds = new ArrayList<>();
+            for (World w : Bukkit.getWorlds()) worlds.add(w.getName());
+            StringUtil.copyPartialMatches(args[1], worlds, completions);
         } else if (args.length == 3 && args[0].equalsIgnoreCase("create")) {
             List<String> hints = new ArrayList<>(Collections.singletonList("flat"));
             for (BiomeGroup bg : BiomeGroup.values()) hints.add(bg.getKey());
             StringUtil.copyPartialMatches(args[2], hints, completions);
-        } else if (args.length >= 4 && args.length <= 9 && args[0].equalsIgnoreCase("create")) {
-            completions.add("100");
-            completions.add("200");
-        } else if (args.length == 10 && args[0].equalsIgnoreCase("create")) {
-            completions.add("nostruct");
         }
         return completions;
     }
