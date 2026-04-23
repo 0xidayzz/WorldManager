@@ -1,0 +1,8 @@
+name: WorldManager
+version: 1.0
+main: fr.oxidayzz.world.WorldManager
+api-version: '1.21'
+author: Oxidayzz
+commands:
+  rw:
+    description: Commande principale pour la gestion des mondes.
