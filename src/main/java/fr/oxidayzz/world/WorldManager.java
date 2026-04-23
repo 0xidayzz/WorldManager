@@ -18,12 +18,12 @@ public class WorldManager extends JavaPlugin {
         this.worldService = new WorldService(this);
 
         if (getCommand("rw") != null) {
-            getCommand("rw").setExecutor(new WorldCommands(this));
+            WorldCommands commands = new WorldCommands(this);
+            getCommand("rw").setExecutor(commands);
+            getCommand("rw").setTabCompleter(commands); // AJOUTE CETTE LIGNE
         }
 
-        // Chargement des mondes existants au démarrage
         loadExistingWorlds();
-
         getLogger().info("WorldManager par Oxidayzz est active !");
     }
 

@@ -160,4 +160,17 @@ public class WorldService {
     private boolean isDefaultWorld(String name) {
         return name.equalsIgnoreCase("world") || name.equalsIgnoreCase("world_nether") || name.equalsIgnoreCase("world_the_end");
     }
+
+    public void teleportPlayer(Player player, String worldName) {
+    World targetWorld = Bukkit.getWorld(worldName);
+
+    if (targetWorld == null) {
+        player.sendMessage("§cLe monde §f" + worldName + " §cn'est pas chargé ou n'existe pas.");
+        return;
+    }
+
+    // Téléportation au spawn du monde cible
+    player.teleport(targetWorld.getSpawnLocation());
+    player.sendMessage("§a§lTP ! §7Vous avez été téléporté dans le monde §b" + worldName + "§7.");
+  }
 }
