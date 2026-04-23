@@ -33,6 +33,14 @@ public class WorldCommands implements CommandExecutor {
                 }
                 break;
 
+            case "delete":
+                if (sender instanceof Player player && args.length >= 2) {
+                    plugin.getWorldService().askDeleteConfirmation(player, args[1]);
+                } else {
+                    sender.sendMessage("§cUsage: /rw delete <nom>");
+                }
+                break;
+
             case "confirm":
                 if (sender instanceof Player player) plugin.getWorldService().confirm(player);
                 break;
@@ -42,10 +50,7 @@ public class WorldCommands implements CommandExecutor {
                 break;
 
             case "list":
-                sender.sendMessage("§6§lMondes Actifs:");
-                for (World w : Bukkit.getWorlds()) {
-                    sender.sendMessage(" §8- §f" + w.getName());
-                }
+                sendList(sender);
                 break;
 
             default:
@@ -55,15 +60,45 @@ public class WorldCommands implements CommandExecutor {
         return true;
     }
 
+    private void sendList(CommandSender sender) {
+        sender.sendMessage(" ");
+        sender.sendMessage("§8§m----------§r §6§lMONDES CHARGÉS §8§m----------");
+        
+        for (World w : Bukkit.getWorlds()) {
+            String name = w.getName();
+            String envTag;
+            
+            // Détermination du nom de l'environnement
+            switch (w.getEnvironment()) {
+                case NORMAL -> envTag = "§aOverworld";
+                case NETHER -> envTag = "§cNether";
+                case THE_END -> envTag = "§dEnd";
+                default -> envTag = "§7Inconnu";
+            }
+
+            // Ajout du tag [Custom] si ce n'est pas un monde de base
+            String customTag = "";
+            if (!name.equalsIgnoreCase("world") && 
+                !name.equalsIgnoreCase("world_nether") && 
+                !name.equalsIgnoreCase("world_the_end")) {
+                customTag = " §8[§b§lCustom§8]";
+            }
+
+            sender.sendMessage(" §8• §f" + name + " §8[§7" + envTag + "§8]" + customTag);
+        }
+        
+        sender.sendMessage("§8§m------------------------------------");
+    }
+
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("§8§m----------------§r §6§lWorldManager §8§m----------------");
         sender.sendMessage(" ");
         sender.sendMessage("§6/rw help §8» §7Affiche ce menu d'aide.");
-        sender.sendMessage("§6/rw create <nom> [flat] §8» §7Créer ou remplacer un monde.");
-        sender.sendMessage("§6/rw delete <nom> §8» §cSupprimer définitivement un monde.");
-        sender.sendMessage("§6/rw confirm §8» §aConfirmer l'écrasement d'un monde.");
-        sender.sendMessage("§6/rw cancel §8» §cAnnuler la création en cours.");
-        sender.sendMessage("§6/rw list §8» §7Afficher la liste des mondes chargés.");
+        sender.sendMessage("§6/rw create <nom> [flat] §8» §7Créer/Remplacer un monde.");
+        sender.sendMessage("§6/rw delete <nom> §8» §cSupprimer définitivement.");
+        sender.sendMessage("§6/rw confirm §8» §aConfirmer l'action en attente.");
+        sender.sendMessage("§6/rw cancel §8» §cAnnuler l'action en attente.");
+        sender.sendMessage("§6/rw list §8» §7Afficher les mondes actifs.");
         sender.sendMessage(" ");
         sender.sendMessage("§8§m--------------------------------------------");
     }
