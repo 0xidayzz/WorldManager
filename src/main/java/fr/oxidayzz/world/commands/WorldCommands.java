@@ -19,7 +19,7 @@ import java.util.List;
 public class WorldCommands implements CommandExecutor, TabCompleter {
 
     private final WorldManager plugin;
-    private final List<String> subCommands = Arrays.asList("help", "create", "delete", "tp", "confirm", "cancel", "list");
+    private final List<String> subCommands = Arrays.asList("create", "delete", "tp", "confirm", "cancel", "list");
 
     public WorldCommands(WorldManager plugin) {
         this.plugin = plugin;
@@ -27,50 +27,58 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
-            sendHelp(sender);
-            return true;
-        }
+        if (!(sender instanceof Player player)) return true;
+
+        if (args.length == 0) return true;
 
         switch (args[0].toLowerCase()) {
             case "create":
-                if (sender instanceof Player player && args.length >= 2) {
-                    String biomeList = (args.length >= 3) ? args[2] : "";
-                    boolean isFlat = biomeList.equalsIgnoreCase("flat");
-                    
-                    // Analyse des options supplémentaires
-                    boolean boost = false;
-                    boolean noStruct = false;
-                    
-                    for (int i = 3; i < args.length; i++) {
-                        if (args[i].equalsIgnoreCase("boost")) boost = true;
-                        if (args[i].equalsIgnoreCase("nostruct")) noStruct = true;
-                    }
+                // Usage: /rw create <nom> <biomes|flat> <d%> <g%> <i%> <l%> <e%> <r%> [nostruct]
+                if (args.length >= 9) {
+                    try {
+                        String name = args[1];
+                        String biomes = args[2];
+                        int d = Integer.parseInt(args[3]);
+                        int g = Integer.parseInt(args[4]);
+                        int i = Integer.parseInt(args[5]);
+                        int l = Integer.parseInt(args[6]);
+                        int e = Integer.parseInt(args[7]);
+                        int r = Integer.parseInt(args[8]);
+                        
+                        boolean noStruct = false;
+                        if (args.length == 10 && args[9].equalsIgnoreCase("nostruct")) {
+                            noStruct = true;
+                        }
 
-                    plugin.getWorldService().askConfirmation(player, args[1], isFlat, isFlat ? "" : biomeList, boost, noStruct);
+                        plugin.getWorldService().askConfirmation(player, name, biomes.equalsIgnoreCase("flat"), 
+                                                               biomes, d, g, i, l, e, r, noStruct);
+                    } catch (NumberFormatException ex) {
+                        player.sendMessage("§cErreur: Les taux de minerais doivent être des nombres.");
+                    }
                 } else {
-                    sender.sendMessage("§cUsage: /rw create <nom> [biomes|flat] [boost] [nostruct]");
+                    player.sendMessage("§cUsage: /rw create <nom> <biomes> <D%> <G%> <I%> <L%> <E%> <R%> [nostruct]");
                 }
                 break;
 
-            case "delete":
-                if (sender instanceof Player player && args.length >= 2) plugin.getWorldService().askDeleteConfirmation(player, args[1]);
+            case "tp":
+                if (args.length >= 2) plugin.getWorldService().teleportPlayer(player, args[1]);
                 break;
 
-            case "tp":
-                if (sender instanceof Player player && args.length >= 2) plugin.getWorldService().teleportPlayer(player, args[1]);
+            case "delete":
+                if (args.length >= 2) plugin.getWorldService().askDeleteConfirmation(player, args[1]);
                 break;
 
             case "confirm":
-                if (sender instanceof Player player) plugin.getWorldService().confirm(player);
+                plugin.getWorldService().confirm(player);
                 break;
 
             case "cancel":
-                if (sender instanceof Player player) plugin.getWorldService().cancel(player);
+                plugin.getWorldService().cancel(player);
                 break;
 
             case "list":
-                sendList(sender);
+                player.sendMessage("§6§lMONDES:");
+                for (World w : Bukkit.getWorlds()) player.sendMessage(" §8• §f" + w.getName());
                 break;
         }
         return true;
@@ -82,26 +90,15 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             StringUtil.copyPartialMatches(args[0], subCommands, completions);
         } else if (args.length == 3 && args[0].equalsIgnoreCase("create")) {
-            List<String> hints = new ArrayList<>();
-            hints.add("flat");
+            List<String> hints = new ArrayList<>(Collections.singletonList("flat"));
             for (BiomeGroup bg : BiomeGroup.values()) hints.add(bg.getKey());
             StringUtil.copyPartialMatches(args[2], hints, completions);
-        } else if (args.length >= 4 && args[0].equalsIgnoreCase("create")) {
-            List<String> options = Arrays.asList("boost", "nostruct");
-            StringUtil.copyPartialMatches(args[args.length - 1], options, completions);
+        } else if (args.length >= 4 && args.length <= 9 && args[0].equalsIgnoreCase("create")) {
+            completions.add("100");
+            completions.add("200");
+        } else if (args.length == 10 && args[0].equalsIgnoreCase("create")) {
+            completions.add("nostruct");
         }
-        Collections.sort(completions);
         return completions;
-    }
-
-    // --- Les méthodes sendHelp et sendList restent les mêmes que précédemment ---
-    private void sendList(CommandSender sender) {
-        sender.sendMessage("§6§lMONDES CHARGÉS:");
-        for (World w : Bukkit.getWorlds()) sender.sendMessage(" §8• §f" + w.getName());
-    }
-
-    private void sendHelp(CommandSender sender) {
-        sender.sendMessage("§6/rw create <nom> [biomes] [boost] [nostruct]");
-        sender.sendMessage("§7Exemple: /rw create MaMap or,plaine boost nostruct");
     }
 }

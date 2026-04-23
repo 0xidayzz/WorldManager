@@ -10,7 +10,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.generator.BlockPopulator;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.util.*;
@@ -25,19 +24,28 @@ public class WorldService {
     }
 
     public enum ActionType { CREATE, DELETE }
-    // Ajout de boostOres et noStructures dans le record
-    public record PendingAction(String name, boolean isFlat, String biomeList, boolean boostOres, boolean noStructures, ActionType type) {}
+    
+    // Record incluant les 6 taux de minerais (en %) et l'option structures
+    public record PendingAction(String name, boolean isFlat, String biomeList, 
+                                int d, int g, int i, int l, int e, int r, 
+                                boolean noStructures, ActionType type) {}
 
-    public void askConfirmation(Player player, String name, boolean isFlat, String biomeList, boolean boostOres, boolean noStructures) {
-        File worldFolder = new File(Bukkit.getWorldContainer(), name);
-        if (Bukkit.getWorld(name) == null && !worldFolder.exists()) {
-            executeCreation(player, name, isFlat, biomeList, boostOres, noStructures);
-            return;
-        }
+    public void askConfirmation(Player player, String name, boolean isFlat, String biomeList, 
+                                int d, int g, int i, int l, int e, int r, boolean noStructures) {
+        
+        pendingActions.put(player.getUniqueId(), new PendingAction(name, isFlat, biomeList, d, g, i, l, e, r, noStructures, ActionType.CREATE));
+        
+        player.sendMessage("§6§lREMPLACEMENT §7- Monde: §b" + name);
+        player.sendMessage("§eBoosts: §fDiamant: " + d + "% | Or: " + g + "% | Fer: " + i + "%");
+        player.sendMessage("§fLapis: " + l + "% | Emeraude: " + e + "% | Redstone: " + r + "%");
+        if (noStructures) player.sendMessage("§c⚠ Structures désactivées");
+        player.sendMessage("§7Tapez §a/rw confirm §7pour valider.");
+    }
 
-        pendingActions.put(player.getUniqueId(), new PendingAction(name, isFlat, biomeList, boostOres, noStructures, ActionType.CREATE));
-        player.sendMessage("§6§lATTENTION ! §eLe monde §b" + name + " §eexiste déjà.");
-        player.sendMessage("§7Voulez-vous le §cremplacer §7? (§a/rw confirm §7ou §c/rw cancel§7)");
+    public void askDeleteConfirmation(Player player, String name) {
+        pendingActions.put(player.getUniqueId(), new PendingAction(name, false, null, 0, 0, 0, 0, 0, 0, false, ActionType.DELETE));
+        player.sendMessage("§6§lSUPPRESSION §7- Monde: §b" + name);
+        player.sendMessage("§7Tapez §a/rw confirm §7pour supprimer définitivement.");
     }
 
     public void confirm(Player player) {
@@ -50,33 +58,39 @@ public class WorldService {
             World old = Bukkit.getWorld(pending.name());
             if (old != null) Bukkit.unloadWorld(old, false);
             
+            // Délai pour libérer les fichiers (raids.dat etc)
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 deleteWorldFolder(new File(Bukkit.getWorldContainer(), pending.name()));
-                executeCreation(player, pending.name(), pending.isFlat(), pending.biomeList(), pending.boostOres(), pending.noStructures());
+                executeCreation(player, pending);
             }, 5L);
         }
     }
 
-    public void executeCreation(Player player, String name, boolean isFlat, String biomeList, boolean boostOres, boolean noStructures) {
+    public void cancel(Player player) {
+        pendingActions.remove(player.getUniqueId());
+        player.sendMessage("§cAction annulée.");
+    }
+
+    private void executeCreation(Player player, PendingAction pa) {
         new BukkitRunnable() {
             int progress = 0;
             @Override
             public void run() {
                 if (progress > 100) { this.cancel(); return; }
-                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent("§eCréation: §b" + progress + "%"));
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent("§eGénération: §b" + progress + "%"));
                 progress += 10;
             }
         }.runTaskTimer(plugin, 0L, 5L);
 
-        WorldCreator creator = new WorldCreator(name);
+        WorldCreator creator = new WorldCreator(pa.name());
         
-        if (isFlat) creator.type(WorldType.FLAT);
-        creator.generateStructures(!noStructures);
+        if (pa.isFlat()) creator.type(WorldType.FLAT);
+        creator.generateStructures(!pa.noStructures());
 
         // Gestion des biomes
-        if (biomeList != null && !biomeList.isEmpty()) {
+        if (pa.biomeList() != null && !pa.biomeList().isEmpty()) {
             List<BiomeGroup> selectedGroups = new ArrayList<>();
-            for (String key : biomeList.split(",")) {
+            for (String key : pa.biomeList().split(",")) {
                 BiomeGroup bg = BiomeGroup.fromKey(key.trim());
                 if (bg != null) selectedGroups.add(bg);
             }
@@ -85,42 +99,19 @@ public class WorldService {
             }
         }
 
-        // Gestion du boost de minerais
-        if (boostOres) {
-            // On utilise un générateur vide qui n'ajoute que notre OrePopulator
-            creator.generator(new org.bukkit.generator.ChunkGenerator() {
-                @Override
-                public @NotNull List<BlockPopulator> getDefaultPopulators(@NotNull World world) {
-                    return Collections.singletonList(new OrePopulator());
-                }
-            });
-        }
+        // Injection du Populator de minerais avec les pourcentages
+        creator.generator(new org.bukkit.generator.ChunkGenerator() {
+            @Override
+            public List<BlockPopulator> getDefaultPopulators(World world) {
+                return Collections.singletonList(new OrePopulator(pa.d(), pa.g(), pa.i(), pa.l(), pa.e(), pa.r()));
+            }
+        });
 
         World world = Bukkit.createWorld(creator);
         if (world != null) {
             world.setGameRule(GameRule.DISABLE_RAIDS, true);
         }
-        player.sendMessage("§a§lSUCCÈS ! §7Monde §f" + name + " §7créé.");
-    }
-
-    // --- Les autres méthodes restent identiques (delete, teleport, etc.) ---
-    public void askDeleteConfirmation(Player player, String name) {
-        World world = Bukkit.getWorld(name);
-        if (world == null && !new File(Bukkit.getWorldContainer(), name).exists()) {
-            player.sendMessage("§cCe monde n'existe pas.");
-            return;
-        }
-        pendingActions.put(player.getUniqueId(), new PendingAction(name, false, null, false, false, ActionType.DELETE));
-        player.sendMessage("§6§lDANGER ! §eVous allez supprimer §b" + name + "§e.");
-        player.sendMessage("§7Action irréversible. (§a/rw confirm §7ou §c/rw cancel§7)");
-    }
-
-    public void cancel(Player player) { pendingActions.remove(player.getUniqueId()); player.sendMessage("§cAnnulé."); }
-
-    public void teleportPlayer(Player player, String worldName) {
-        World target = Bukkit.getWorld(worldName);
-        if (target != null) { player.teleport(target.getSpawnLocation()); player.sendMessage("§aTéléporté !"); }
-        else player.sendMessage("§cMonde introuvable.");
+        player.sendMessage("§a§lSUCCÈS ! §7Le monde §f" + pa.name() + " §7est prêt.");
     }
 
     private void executeDeletion(CommandSender sender, String name) {
@@ -130,14 +121,29 @@ public class WorldService {
             Bukkit.unloadWorld(world, false);
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (deleteWorldFolder(new File(Bukkit.getWorldContainer(), name))) sender.sendMessage("§aSupprimé.");
+            if (deleteWorldFolder(new File(Bukkit.getWorldContainer(), name))) {
+                sender.sendMessage("§aMonde supprimé.");
+            }
         }, 10L);
+    }
+
+    public void teleportPlayer(Player player, String worldName) {
+        World target = Bukkit.getWorld(worldName);
+        if (target != null) {
+            player.teleport(target.getSpawnLocation());
+            player.sendMessage("§aTéléporté !");
+        } else player.sendMessage("§cMonde introuvable.");
     }
 
     private boolean deleteWorldFolder(File path) {
         if (path.exists()) {
             File[] files = path.listFiles();
-            if (files != null) { for (File f : files) { if (f.isDirectory()) deleteWorldFolder(f); else f.delete(); } }
+            if (files != null) {
+                for (File f : files) {
+                    if (f.isDirectory()) deleteWorldFolder(f);
+                    else f.delete();
+                }
+            }
             return path.delete();
         }
         return true;
