@@ -22,7 +22,6 @@ public class WorldService {
     }
 
     public enum ActionType { CREATE, DELETE }
-    // On ajoute biomeList au record
     public record PendingAction(String name, boolean isFlat, String biomeList, ActionType type) {}
 
     public void askConfirmation(Player player, String name, boolean isFlat, String biomeList) {
@@ -62,9 +61,16 @@ public class WorldService {
             executeDeletion(player, pending.name());
         } else {
             World old = Bukkit.getWorld(pending.name());
-            if (old != null) Bukkit.unloadWorld(old, false);
-            deleteWorldFolder(new File(Bukkit.getWorldContainer(), pending.name()));
-            executeCreation(player, pending.name(), pending.isFlat(), pending.biomeList());
+            if (old != null) {
+                // On décharge SANS sauvegarder pour éviter les erreurs de fichiers occupés
+                Bukkit.unloadWorld(old, false);
+            }
+            
+            // On attend 5 ticks (1/4 de sec) pour laisser Windows/Linux libérer le dossier
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                deleteWorldFolder(new File(Bukkit.getWorldContainer(), pending.name()));
+                executeCreation(player, pending.name(), pending.isFlat(), pending.biomeList());
+            }, 5L);
         }
     }
 
@@ -89,15 +95,12 @@ public class WorldService {
             for (Player p : world.getPlayers()) p.teleport(fallback.getSpawnLocation());
             Bukkit.unloadWorld(world, false);
         }
-        System.gc();
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (deleteWorldFolder(new File(Bukkit.getWorldContainer(), name))) {
-                    sender.sendMessage("§aSupprimé.");
-                }
+        
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (deleteWorldFolder(new File(Bukkit.getWorldContainer(), name))) {
+                sender.sendMessage("§aSupprimé avec succès.");
             }
-        }.runTaskLater(plugin, 20L);
+        }, 10L);
     }
 
     private void executeCreation(Player player, String name, boolean isFlat, String biomeList) {
@@ -112,9 +115,11 @@ public class WorldService {
         }.runTaskTimer(plugin, 0L, 5L);
 
         WorldCreator creator = new WorldCreator(name);
-        if (isFlat) creator.type(WorldType.FLAT);
+        if (isFlat) {
+            creator.type(WorldType.FLAT);
+            creator.generateStructures(false);
+        }
 
-        // Application des biomes si spécifiés
         if (biomeList != null && !biomeList.isEmpty()) {
             List<BiomeGroup> selectedGroups = new ArrayList<>();
             for (String key : biomeList.split(",")) {
@@ -126,8 +131,12 @@ public class WorldService {
             }
         }
 
-        Bukkit.createWorld(creator);
-        player.sendMessage("§a§lSUCCÈS ! §7Monde §f" + name + " §7créé.");
+        World world = Bukkit.createWorld(creator);
+        if (world != null) {
+            // Désactive les raids pour éviter l'erreur de fichier raids.dat au prochain unload
+            world.setGameRule(GameRule.DISABLE_RAIDS, true);
+        }
+        player.sendMessage("§a§lSUCCÈS ! §7Monde §f" + name + " §7prêt.");
     }
 
     private boolean deleteWorldFolder(File path) {

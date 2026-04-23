@@ -4,39 +4,35 @@ import org.bukkit.block.Biome;
 import org.bukkit.generator.BiomeProvider;
 import org.bukkit.generator.WorldInfo;
 import org.jetbrains.annotations.NotNull;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class FlexibleBiomeProvider extends BiomeProvider {
 
-    private final List<Biome> allowed;
-    private final Biome fallback;
+    private final List<Biome> allowedBiomes;
 
-    public FlexibleBiomeProvider(List<BiomeGroup> groups) {
-        this.allowed = new ArrayList<>();
-        for (BiomeGroup g : groups) {
-            allowed.addAll(g.getBiomes());
+    public FlexibleBiomeProvider(List<BiomeGroup> enabledGroups) {
+        this.allowedBiomes = new ArrayList<>();
+        for (BiomeGroup group : enabledGroups) {
+            allowedBiomes.addAll(group.getBiomes());
         }
-        
-        if (allowed.isEmpty()) {
-            allowed.add(Biome.PLAINS);
+        // Sécurité : Plaines par défaut si la liste est vide
+        if (allowedBiomes.isEmpty()) {
+            allowedBiomes.add(Biome.PLAINS);
         }
-        
-        // On définit le biome par défaut (le premier de ta liste)
-        this.fallback = allowed.get(0);
     }
 
     @Override
     public @NotNull Biome getBiome(@NotNull WorldInfo worldInfo, int x, int y, int z) {
-        // C'est ici que la magie opère : 
-        // Si Minecraft essaie de mettre un biome qui n'est pas dans notre liste 
-        // (comme un océan car le terrain est bas), on le force avec notre fallback (ex: plaine)
-        // Cela transforme les fonds marins en plaines terrestres.
-        return fallback; 
+        // En retournant systématiquement le premier biome autorisé ici, 
+        // on force le générateur à ignorer les suggestions d'océans par défaut.
+        return allowedBiomes.get(0);
     }
 
     @Override
     public @NotNull List<Biome> getBiomes(@NotNull WorldInfo worldInfo) {
-        return allowed;
+        // Liste complète des biomes dans lesquels Minecraft peut piocher
+        return allowedBiomes;
     }
 }
