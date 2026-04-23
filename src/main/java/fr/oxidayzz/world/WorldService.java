@@ -72,47 +72,52 @@ public class WorldService {
     }
 
     private void executeCreation(Player player, PendingAction pa) {
-        new BukkitRunnable() {
-            int progress = 0;
-            @Override
-            public void run() {
-                if (progress > 100) { this.cancel(); return; }
-                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent("§eGénération: §b" + progress + "%"));
-                progress += 10;
-            }
-        }.runTaskTimer(plugin, 0L, 5L);
-
-        WorldCreator creator = new WorldCreator(pa.name());
-        
-        if (pa.isFlat()) creator.type(WorldType.FLAT);
-        creator.generateStructures(!pa.noStructures());
-
-        // Gestion des biomes
-        if (pa.biomeList() != null && !pa.biomeList().isEmpty()) {
-            List<BiomeGroup> selectedGroups = new ArrayList<>();
-            for (String key : pa.biomeList().split(",")) {
-                BiomeGroup bg = BiomeGroup.fromKey(key.trim());
-                if (bg != null) selectedGroups.add(bg);
-            }
-            if (!selectedGroups.isEmpty()) {
-                creator.biomeProvider(new FlexibleBiomeProvider(selectedGroups));
-            }
+    // 1. Affichage de la barre de progression
+    new BukkitRunnable() {
+        int progress = 0;
+        @Override
+        public void run() {
+            if (progress > 100) { this.cancel(); return; }
+            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent("§eGénération: §b" + progress + "%"));
+            progress += 10;
         }
+    }.runTaskTimer(plugin, 0L, 5L);
 
-        // Injection du Populator de minerais avec les pourcentages
-        creator.generator(new org.bukkit.generator.ChunkGenerator() {
-            @Override
-            public List<BlockPopulator> getDefaultPopulators(World world) {
-                return Collections.singletonList(new OrePopulator(pa.d(), pa.g(), pa.i(), pa.l(), pa.e(), pa.r()));
-            }
-        });
+    // 2. Configuration du créateur (SANS toucher au .generator())
+    WorldCreator creator = new WorldCreator(pa.name());
+    creator.generateStructures(!pa.noStructures());
+    if (pa.isFlat()) creator.type(WorldType.FLAT);
 
-        World world = Bukkit.createWorld(creator);
-        if (world != null) {
-            world.setGameRule(GameRule.DISABLE_RAIDS, true);
+    // 3. Gestion des biomes (on garde notre FlexibleBiomeProvider)
+    if (pa.biomeList() != null && !pa.biomeList().isEmpty()) {
+        List<BiomeGroup> selectedGroups = new ArrayList<>();
+        for (String key : pa.biomeList().split(",")) {
+            BiomeGroup bg = BiomeGroup.fromKey(key.trim());
+            if (bg != null) selectedGroups.add(bg);
         }
-        player.sendMessage("§a§lSUCCÈS ! §7Le monde §f" + pa.name() + " §7est prêt.");
+        if (!selectedGroups.isEmpty()) {
+            creator.biomeProvider(new FlexibleBiomeProvider(selectedGroups));
+        }
     }
+
+    // 4. Création du monde
+    World world = Bukkit.createWorld(creator);
+
+    if (world != null) {
+        world.setGameRule(GameRule.DISABLE_RAIDS, true);
+        
+        // 5. C'est ICI qu'on ajoute les minerais sans casser le terrain !
+        // On ajoute notre OrePopulator à la liste des populators existants du monde
+        world.getPopulators().add(new OrePopulator(pa.d(), pa.g(), pa.i(), pa.l(), pa.e(), pa.r()));
+
+        // 6. Sécurisation du spawn
+        Location spawn = new Location(world, 0.5, 100, 0.5);
+        world.setSpawnLocation(spawn);
+        spawn.clone().subtract(0, 1, 0).getBlock().setType(Material.GLASS);
+    }
+    
+    player.sendMessage("§a§lSUCCÈS ! §7Le monde §f" + pa.name() + " §7est généré avec relief et minerais.");
+  }
 
     private void executeDeletion(CommandSender sender, String name) {
         World world = Bukkit.getWorld(name);
