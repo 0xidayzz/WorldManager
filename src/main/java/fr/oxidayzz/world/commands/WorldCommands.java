@@ -24,7 +24,7 @@ public class WorldCommands implements CommandExecutor {
             sendHelp(sender);
             return true;
         }
-
+        
         // 2. Gestion des autres sous-commandes
         switch (args[0].toLowerCase()) {
             case "info":
