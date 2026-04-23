@@ -19,7 +19,7 @@ import java.util.List;
 public class WorldCommands implements CommandExecutor, TabCompleter {
 
     private final WorldManager plugin;
-    private final List<String> subCommands = Arrays.asList("create", "delete", "tp", "confirm", "cancel", "list", "scan", "pregen");
+    private final List<String> subCommands = Arrays.asList("create", "delete", "tp", "confirm", "cancel", "list", "scan", "pregen", "gui");
 
     public WorldCommands(WorldManager plugin) {
         this.plugin = plugin;
@@ -41,7 +41,9 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
                     } catch (Exception e) { player.sendMessage("§cUsage: /rw create <nom> <biomes> <D%> <G%> <I%> <L%> <E%> <R%> [nostruct]"); }
                 }
                 break;
-
+            case "gui":
+              plugin.getWorldGui().openMainGui(player);
+              break;
             case "pregen":
                 if (args.length >= 3) {
                     plugin.getWorldService().pregenWorld(player, args[1], Integer.parseInt(args[2]));
