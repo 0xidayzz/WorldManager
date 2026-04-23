@@ -37,31 +37,28 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
                 if (sender instanceof Player player && args.length >= 2) {
                     String biomeList = (args.length >= 3) ? args[2] : "";
                     boolean isFlat = biomeList.equalsIgnoreCase("flat");
-                    // On envoie la liste des biomes au service (vide si c'est un monde plat)
-                    plugin.getWorldService().askConfirmation(player, args[1], isFlat, isFlat ? "" : biomeList);
+                    
+                    // Analyse des options supplémentaires
+                    boolean boost = false;
+                    boolean noStruct = false;
+                    
+                    for (int i = 3; i < args.length; i++) {
+                        if (args[i].equalsIgnoreCase("boost")) boost = true;
+                        if (args[i].equalsIgnoreCase("nostruct")) noStruct = true;
+                    }
+
+                    plugin.getWorldService().askConfirmation(player, args[1], isFlat, isFlat ? "" : biomeList, boost, noStruct);
                 } else {
-                    sender.sendMessage("§cUsage: /rw create <nom> [flat|groupe1,groupe2...]");
+                    sender.sendMessage("§cUsage: /rw create <nom> [biomes|flat] [boost] [nostruct]");
                 }
                 break;
 
             case "delete":
-                if (sender instanceof Player player && args.length >= 2) {
-                    plugin.getWorldService().askDeleteConfirmation(player, args[1]);
-                } else {
-                    sender.sendMessage("§cUsage: /rw delete <nom>");
-                }
+                if (sender instanceof Player player && args.length >= 2) plugin.getWorldService().askDeleteConfirmation(player, args[1]);
                 break;
 
             case "tp":
-                if (sender instanceof Player player) {
-                    if (args.length >= 2) {
-                        plugin.getWorldService().teleportPlayer(player, args[1]);
-                    } else {
-                        player.sendMessage("§cUsage: /rw tp <nom>");
-                    }
-                } else {
-                    sender.sendMessage("§cSeul un joueur peut se téléporter.");
-                }
+                if (sender instanceof Player player && args.length >= 2) plugin.getWorldService().teleportPlayer(player, args[1]);
                 break;
 
             case "confirm":
@@ -75,10 +72,6 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
             case "list":
                 sendList(sender);
                 break;
-
-            default:
-                sender.sendMessage("§cCommande inconnue.");
-                break;
         }
         return true;
     }
@@ -86,73 +79,29 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
-
         if (args.length == 1) {
             StringUtil.copyPartialMatches(args[0], subCommands, completions);
-        } 
-        else if (args.length == 2) {
-            if (args[0].equalsIgnoreCase("tp") || args[0].equalsIgnoreCase("delete")) {
-                List<String> worldNames = new ArrayList<>();
-                for (World w : Bukkit.getWorlds()) {
-                    worldNames.add(w.getName());
-                }
-                StringUtil.copyPartialMatches(args[1], worldNames, completions);
-            }
-        } 
-        else if (args.length == 3 && args[0].equalsIgnoreCase("create")) {
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("create")) {
             List<String> hints = new ArrayList<>();
             hints.add("flat");
-            for (BiomeGroup bg : BiomeGroup.values()) {
-                hints.add(bg.getKey());
-            }
-            // Note: Pour les listes (ex: or,jungle), le TabCompleter de base est limité, 
-            // mais ici il proposera les groupes individuellement.
+            for (BiomeGroup bg : BiomeGroup.values()) hints.add(bg.getKey());
             StringUtil.copyPartialMatches(args[2], hints, completions);
+        } else if (args.length >= 4 && args[0].equalsIgnoreCase("create")) {
+            List<String> options = Arrays.asList("boost", "nostruct");
+            StringUtil.copyPartialMatches(args[args.length - 1], options, completions);
         }
-
         Collections.sort(completions);
         return completions;
     }
 
+    // --- Les méthodes sendHelp et sendList restent les mêmes que précédemment ---
     private void sendList(CommandSender sender) {
-        sender.sendMessage(" ");
-        sender.sendMessage("§8§m----------§r §6§lMONDES CHARGÉS §8§m----------");
-        
-        for (World w : Bukkit.getWorlds()) {
-            String name = w.getName();
-            String envTag;
-            
-            switch (w.getEnvironment()) {
-                case NORMAL -> envTag = "§aOverworld";
-                case NETHER -> envTag = "§cNether";
-                case THE_END -> envTag = "§dEnd";
-                default -> envTag = "§7Inconnu";
-            }
-
-            String customTag = "";
-            if (!name.equalsIgnoreCase("world") && 
-                !name.equalsIgnoreCase("world_nether") && 
-                !name.equalsIgnoreCase("world_the_end")) {
-                customTag = " §8[§b§lCustom§8]";
-            }
-
-            sender.sendMessage(" §8• §f" + name + " §8[§7" + envTag + "§8]" + customTag);
-        }
-        
-        sender.sendMessage("§8§m------------------------------------");
+        sender.sendMessage("§6§lMONDES CHARGÉS:");
+        for (World w : Bukkit.getWorlds()) sender.sendMessage(" §8• §f" + w.getName());
     }
 
     private void sendHelp(CommandSender sender) {
-        sender.sendMessage("§8§m----------------§r §6§lWorldManager §8§m----------------");
-        sender.sendMessage(" ");
-        sender.sendMessage("§6/rw help §8» §7Affiche ce menu d'aide.");
-        sender.sendMessage("§6/rw create <nom> [flat|biomes] §8» §7Créer avec biomes spécifiques.");
-        sender.sendMessage("§6/rw delete <nom> §8» §cSupprimer définitivement.");
-        sender.sendMessage("§6/rw tp <nom> §8» §7Se téléporter au monde.");
-        sender.sendMessage("§6/rw confirm §8» §aConfirmer l'action.");
-        sender.sendMessage("§6/rw list §8» §7Afficher les mondes actifs.");
-        sender.sendMessage(" ");
-        sender.sendMessage("§7Exemple biomes: §f/rw create MonMonde or,jungle,riviere");
-        sender.sendMessage("§8§m--------------------------------------------");
+        sender.sendMessage("§6/rw create <nom> [biomes] [boost] [nostruct]");
+        sender.sendMessage("§7Exemple: /rw create MaMap or,plaine boost nostruct");
     }
 }

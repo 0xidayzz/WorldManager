@@ -17,7 +17,6 @@ public class FlexibleBiomeProvider extends BiomeProvider {
         for (BiomeGroup group : enabledGroups) {
             allowedBiomes.addAll(group.getBiomes());
         }
-        // Sécurité : Plaines par défaut si la liste est vide
         if (allowedBiomes.isEmpty()) {
             allowedBiomes.add(Biome.PLAINS);
         }
@@ -25,14 +24,11 @@ public class FlexibleBiomeProvider extends BiomeProvider {
 
     @Override
     public @NotNull Biome getBiome(@NotNull WorldInfo worldInfo, int x, int y, int z) {
-        // En retournant systématiquement le premier biome autorisé ici, 
-        // on force le générateur à ignorer les suggestions d'océans par défaut.
         return allowedBiomes.get(0);
     }
 
     @Override
     public @NotNull List<Biome> getBiomes(@NotNull WorldInfo worldInfo) {
-        // Liste complète des biomes dans lesquels Minecraft peut piocher
         return allowedBiomes;
     }
 }
