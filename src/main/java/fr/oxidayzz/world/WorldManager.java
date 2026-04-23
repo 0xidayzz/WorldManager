@@ -1,27 +1,32 @@
 package fr.oxidayzz.world;
 
+import fr.oxidayzz.world.commands.WorldCommands;
 import org.bukkit.plugin.java.JavaPlugin;
 
-/**
- * Classe principale du plugin WorldManager.
- * Gère le cycle de vie du plugin (activation/désactivation).
- */
 public class WorldManager extends JavaPlugin {
+
+    private WorldService worldService;
 
     @Override
     public void onEnable() {
-        // Message envoyé dans la console lors du démarrage
-        getLogger().info("========================================");
-        getLogger().info("WorldManager est active !");
-        getLogger().info("Version: " + getDescription().getVersion());
-        getLogger().info("========================================");
+        // Initialisation du service avec l'instance du plugin
+        this.worldService = new WorldService(this);
 
-        // C'est ici que nous enregistrerons les commandes et les évènements plus tard
+        // Enregistrement de la commande principale
+        if (getCommand("rw") != null) {
+            getCommand("rw").setExecutor(new WorldCommands(this));
+        }
+
+        getLogger().info("WorldManager par Oxidayzz est active !");
+    }
+
+    // Le getter indispensable pour WorldCommands
+    public WorldService getWorldService() {
+        return worldService;
     }
 
     @Override
     public void onDisable() {
-        // Message envoyé dans la console lors de l'arrêt
-        getLogger().info("WorldManager s'arrete, fermeture des mondes...");
+        getLogger().info("WorldManager s'arrete...");
     }
 }

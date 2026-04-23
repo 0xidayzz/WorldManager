@@ -1,12 +1,12 @@
 package fr.oxidayzz.world.commands;
 
 import fr.oxidayzz.world.WorldManager;
-
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
 public class WorldCommands implements CommandExecutor {
 
@@ -17,54 +17,49 @@ public class WorldCommands implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand( CommandSender sender, Command command, String label, String[] args) {
-        
-        // 1. Si le joueur tape juste /rw ou /rw help
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
             sendHelp(sender);
             return true;
         }
-        
-        // 2. Gestion des autres sous-commandes
+
         switch (args[0].toLowerCase()) {
-            case "info":
-                sender.sendMessage("§a§l[WorldManager] §7Version: §f" + plugin.getDescription().getVersion());
-                sender.sendMessage("§a§l[WorldManager] §7Auteur: §fOxidayzz");
-                break;
-            case "list":
-                sender.sendMessage("§8§m----------------§r §6§lMondes Actifs §8§m----------------");
-                // On boucle sur tous les mondes chargés par le serveur
-                for (World w : Bukkit.getWorlds()) {
-                    String environment = getEnvName(w.getEnvironment());
-                    sender.sendMessage("§8- §f" + w.getName() + " §7(" + environment + "§7)");
+            case "create":
+                if (sender instanceof Player player && args.length >= 2) {
+                    boolean isFlat = (args.length >= 3 && args[2].equalsIgnoreCase("flat"));
+                    plugin.getWorldService().askConfirmation(player, args[1], isFlat);
+                } else {
+                    sender.sendMessage("§cUsage: /rw create <nom> [flat]");
                 }
-                sender.sendMessage("§8§m--------------------------------------------");
-                break;    
+                break;
+
+            case "confirm":
+                if (sender instanceof Player player) plugin.getWorldService().confirm(player);
+                break;
+
+            case "cancel":
+                if (sender instanceof Player player) plugin.getWorldService().cancel(player);
+                break;
+
+            case "list":
+                sender.sendMessage("§6§lMondes Actifs:");
+                for (World w : Bukkit.getWorlds()) {
+                    sender.sendMessage(" §8- §f" + w.getName());
+                }
+                break;
 
             default:
-                sender.sendMessage("§cCommande inconnue. Tapez §6/rw help");
+                sender.sendMessage("§cCommande inconnue.");
                 break;
         }
-
         return true;
     }
 
-    // Petite méthode pour afficher un joli menu
     private void sendHelp(CommandSender sender) {
-        sender.sendMessage("§8§m----------------§r §6§lWorldManager §8§m----------------");
-        sender.sendMessage(" ");
-        sender.sendMessage("§6/rw help §8» §7Affiche ce menu d'aide.");
-        sender.sendMessage("§6/rw list §8» §7Liste les mondes chargés.");
-        sender.sendMessage("§6/rw info §8» §7Informations sur le plugin.");
-        sender.sendMessage(" ");
-        sender.sendMessage("§8§m--------------------------------------------");
-    }
-    private String getEnvName(World.Environment env) {
-        return switch (env) {
-            case NORMAL -> "§aOverworld";
-            case NETHER -> "§cNether";
-            case THE_END -> "§dEnd";
-            case CUSTOM -> "§bCustom";
-        };
+        sender.sendMessage("§8§m-----------§r §6WorldManager §8§m-----------");
+        sender.sendMessage("§6/rw create <nom> [flat]");
+        sender.sendMessage("§6/rw confirm §7/ §6/rw cancel");
+        sender.sendMessage("§6/rw list");
+        sender.sendMessage("§8§m--------------------------------");
     }
 }
