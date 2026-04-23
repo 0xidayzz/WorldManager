@@ -18,14 +18,12 @@ import java.util.UUID;
 public class WorldService {
 
     private final WorldManager plugin;
-    // On stocke maintenant une "Action" en attente (soit CREATE, soit DELETE)
     private final Map<UUID, PendingAction> pendingActions = new HashMap<>();
 
     public WorldService(WorldManager plugin) {
         this.plugin = plugin;
     }
 
-    // Enum pour différencier l'action à confirmer
     public enum ActionType { CREATE, DELETE }
     public record PendingAction(String name, boolean isFlat, ActionType type) {}
 
@@ -42,7 +40,6 @@ public class WorldService {
         player.sendMessage("§7Voulez-vous le §cremplacer §7? (§a/rw confirm §7ou §c/rw cancel§7)");
     }
 
-    // Nouvelle méthode pour demander la suppression
     public void askDeleteConfirmation(Player player, String name) {
         World world = Bukkit.getWorld(name);
         File worldFolder = new File(Bukkit.getWorldContainer(), name);
@@ -52,7 +49,6 @@ public class WorldService {
             return;
         }
 
-        // Protection des mondes par défaut
         if (isDefaultWorld(name)) {
             player.sendMessage("§cImpossible de supprimer un monde principal du serveur.");
             return;
@@ -73,7 +69,7 @@ public class WorldService {
         if (pending.type() == ActionType.DELETE) {
             executeDeletion(player, pending.name());
         } else {
-            // C'est un remplacement (CREATE)
+            // Remplacement : on décharge et on supprime AVANT de recréer
             World oldWorld = Bukkit.getWorld(pending.name());
             if (oldWorld != null) {
                 Bukkit.unloadWorld(oldWorld, false);
@@ -94,16 +90,22 @@ public class WorldService {
     private void executeDeletion(CommandSender sender, String name) {
         World world = Bukkit.getWorld(name);
         if (world != null) {
-            // On téléporte les joueurs avant de décharger
             World fallback = Bukkit.getWorlds().get(0);
             for (Player p : world.getPlayers()) {
                 p.teleport(fallback.getSpawnLocation());
                 p.sendMessage("§7Le monde a été supprimé, retour au spawn.");
             }
+            // Déchargement forcé sans sauvegarde
             Bukkit.unloadWorld(world, false);
         }
-        deleteWorldFolder(new File(Bukkit.getWorldContainer(), name));
-        sender.sendMessage("§a§lSUCCÈS ! §7Le monde §f" + name + " §7a été supprimé.");
+
+        File worldFolder = new File(Bukkit.getWorldContainer(), name);
+        // On attend un tout petit peu que Bukkit lâche les fichiers (optionnel mais recommandé)
+        if (deleteWorldFolder(worldFolder)) {
+            sender.sendMessage("§a§lSUCCÈS ! §7Le monde §f" + name + " §7a été supprimé.");
+        } else {
+            sender.sendMessage("§c§lERREUR ! §7Impossible de supprimer les fichiers. Le dossier est peut-être utilisé.");
+        }
     }
 
     private void executeCreation(Player player, String name, boolean isFlat) {
@@ -141,7 +143,7 @@ public class WorldService {
         return bar.append("§8]").toString();
     }
 
-    private void deleteWorldFolder(File path) {
+    private boolean deleteWorldFolder(File path) {
         if (path.exists()) {
             File[] files = path.listFiles();
             if (files != null) {
@@ -150,8 +152,9 @@ public class WorldService {
                     else f.delete();
                 }
             }
-            path.delete();
+            return path.delete();
         }
+        return true;
     }
 
     private boolean isDefaultWorld(String name) {
