@@ -5,10 +5,14 @@ import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.LimitedRegion;
 import org.bukkit.generator.WorldInfo;
 import org.jetbrains.annotations.NotNull;
+
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class OrePopulator extends BlockPopulator {
 
+    private static final Logger LOGGER = Logger.getLogger(OrePopulator.class.getName());
     private final double dMult, gMult, iMult, lMult, eMult, rMult;
 
     public OrePopulator(int dPct, int gPct, int iPct, int lPct, int ePct, int rPct) {
@@ -46,17 +50,14 @@ public class OrePopulator extends BlockPopulator {
         y = Math.max(-64, Math.min(319, y));
 
         try {
-            // Dans LimitedRegion, getType(x, y, z) avec x et z entre 0 et 15 
-            // cible automatiquement le chunk en cours de génération.
             Material current = region.getType(x, y, z);
-            
+
             if (current == Material.STONE || current == Material.DEEPSLATE || current == Material.TUFF) {
                 region.setType(x, y, z, mat);
             }
         } catch (IndexOutOfBoundsException | IllegalArgumentException e) {
-            // Si jamais on dépasse (ne devrait pas arriver avec 0-15), 
-            // on ignore pour éviter de faire crash le serveur.
-            continue; 
+            LOGGER.log(Level.FINE, "OrePopulator: coordonn\u00e9es hors limites ({0}, {1}, {2}) pour {3}: {4}",
+                    new Object[]{x, y, z, mat.name(), e.getMessage()});
         }
     }
   }

@@ -50,16 +50,27 @@ public class WorldService {
 
     public void confirm(Player player) {
         PendingAction pending = pendingActions.remove(player.getUniqueId());
-        if (pending == null) return;
+        if (pending == null) {
+            player.sendMessage("§cAucune action en attente de confirmation.");
+            return;
+        }
 
         if (pending.type() == ActionType.DELETE) {
             executeDeletion(player, pending.name());
         } else {
             World old = Bukkit.getWorld(pending.name());
-            if (old != null) Bukkit.unloadWorld(old, false);
+            if (old != null) {
+                boolean unloaded = Bukkit.unloadWorld(old, false);
+                if (!unloaded) {
+                    player.sendMessage("§cImpossible de décharger le monde §f" + pending.name() + "§c. Annulation.");
+                    return;
+                }
+            }
             
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                deleteWorldFolder(new File(Bukkit.getWorldContainer(), pending.name()));
+                if (!deleteWorldFolder(new File(Bukkit.getWorldContainer(), pending.name()))) {
+                    player.sendMessage("§c⚠ Suppression partielle du dossier monde §f" + pending.name() + "§c.");
+                }
                 executeCreation(player, pending);
             }, 5L);
         }
@@ -86,16 +97,28 @@ public class WorldService {
             if (!selectedGroups.isEmpty()) creator.biomeProvider(new FlexibleBiomeProvider(selectedGroups));
         }
 
-        World world = Bukkit.createWorld(creator);
-        if (world != null) {
-            world.setGameRule(GameRule.DISABLE_RAIDS, true);
-            // On ajoute le populator APRES la création pour ne pas vider le monde
-            world.getPopulators().add(new OrePopulator(pa.d(), pa.g(), pa.i(), pa.l(), pa.e(), pa.r()));
-            
-            Location spawn = new Location(world, 0.5, 100, 0.5);
-            world.setSpawnLocation(spawn);
-            spawn.clone().subtract(0, 1, 0).getBlock().setType(Material.GLASS);
+        World world;
+        try {
+            world = Bukkit.createWorld(creator);
+        } catch (Exception e) {
+            plugin.getLogger().severe("Erreur lors de la création du monde '" + pa.name() + "': " + e.getMessage());
+            player.sendMessage("§c§lERREUR ! §7Impossible de créer le monde §f" + pa.name() + "§7.");
+            return;
         }
+
+        if (world == null) {
+            plugin.getLogger().warning("Création du monde '" + pa.name() + "' a retourné null.");
+            player.sendMessage("§c§lERREUR ! §7La création du monde §f" + pa.name() + " §7a échoué.");
+            return;
+        }
+
+        world.setGameRule(GameRule.DISABLE_RAIDS, true);
+        world.getPopulators().add(new OrePopulator(pa.d(), pa.g(), pa.i(), pa.l(), pa.e(), pa.r()));
+
+        Location spawn = new Location(world, 0.5, 100, 0.5);
+        world.setSpawnLocation(spawn);
+        spawn.clone().subtract(0, 1, 0).getBlock().setType(Material.GLASS);
+
         player.sendMessage("§a§lSUCCÈS ! §7Le monde §f" + pa.name() + " §7est créé.");
     }
 
@@ -103,50 +126,69 @@ public class WorldService {
         World world = Bukkit.getWorld(name);
         if (world != null) {
             for (Player p : world.getPlayers()) p.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
-            Bukkit.unloadWorld(world, false);
+            boolean unloaded = Bukkit.unloadWorld(world, false);
+            if (!unloaded) {
+                sender.sendMessage("§cImpossible de décharger le monde §f" + name + "§c. Suppression annulée.");
+                return;
+            }
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (deleteWorldFolder(new File(Bukkit.getWorldContainer(), name))) sender.sendMessage("§aSupprimé.");
+            if (deleteWorldFolder(new File(Bukkit.getWorldContainer(), name))) {
+                sender.sendMessage("§aSupprimé.");
+            } else {
+                sender.sendMessage("§cÉchec de la suppression du dossier monde §f" + name + "§c.");
+            }
         }, 10L);
     }
 
     // --- SYSTÈME DE PREGEN (ASYNC) ---
 
     public void pregenWorld(Player player, String worldName, int radiusInChunks) {
-    World world = Bukkit.getWorld(worldName);
-    if (world == null) {
-        player.sendMessage("§cMonde introuvable.");
-        return;
-    }
+        World world = Bukkit.getWorld(worldName);
+        if (world == null) {
+            player.sendMessage("§cMonde introuvable.");
+            return;
+        }
 
-    // Calcul du nombre total de chunks (ex: rayon 1 = 3x3 chunks = 9)
-    int total = (int) Math.pow((radiusInChunks * 2 + 1), 2);
-    player.sendMessage("§e[Pregen] §7Génération de §b" + total + " §7chunks...");
+        int total = (int) Math.pow((radiusInChunks * 2 + 1), 2);
+        player.sendMessage("§e[Pregen] §7Génération de §b" + total + " §7chunks...");
 
-    int[] count = {0};
-    long startTime = System.currentTimeMillis();
+        int[] count = {0};
+        int[] errors = {0};
+        long startTime = System.currentTimeMillis();
 
-    for (int x = -radiusInChunks; x <= radiusInChunks; x++) {
-        for (int z = -radiusInChunks; z <= radiusInChunks; z++) {
-            // Paper API : Retourne un CompletableFuture<Chunk>
-            world.getChunkAtAsync(x, z).thenAccept(chunk -> {
-                count[0]++;
-                
-                // Affichage de la progression
-                if (count[0] % 50 == 0 || count[0] == total) {
-                    double progress = (double) count[0] / total * 100;
-                    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, 
-                        new TextComponent(String.format("§ePregen: §b%.1f%% §7(%d/%d)", progress, count[0], total)));
-                }
+        for (int x = -radiusInChunks; x <= radiusInChunks; x++) {
+            for (int z = -radiusInChunks; z <= radiusInChunks; z++) {
+                world.getChunkAtAsync(x, z).thenAccept(chunk -> {
+                    count[0]++;
 
-                // Une fois fini
-                if (count[0] == total) {
-                    long duration = (System.currentTimeMillis() - startTime) / 1000;
-                    player.sendMessage("§a§lTERMINÉ ! §7" + total + " chunks générés en " + duration + "s.");
-                    world.save();
-                }
-            });
-          }
+                    if (count[0] % 50 == 0 || count[0] == total) {
+                        double progress = (double) count[0] / total * 100;
+                        player.spigot().sendMessage(ChatMessageType.ACTION_BAR,
+                            new TextComponent(String.format("§ePregen: §b%.1f%% §7(%d/%d)", progress, count[0], total)));
+                    }
+
+                    if (count[0] == total) {
+                        long duration = (System.currentTimeMillis() - startTime) / 1000;
+                        String msg = "§a§lTERMINÉ ! §7" + total + " chunks générés en " + duration + "s.";
+                        if (errors[0] > 0) {
+                            msg += " §c(" + errors[0] + " erreurs)";
+                        }
+                        player.sendMessage(msg);
+                        world.save();
+                    }
+                }).exceptionally(ex -> {
+                    errors[0]++;
+                    count[0]++;
+                    plugin.getLogger().warning("Erreur pregen chunk: " + ex.getMessage());
+                    if (count[0] == total) {
+                        long duration = (System.currentTimeMillis() - startTime) / 1000;
+                        player.sendMessage("§e[Pregen] §7Terminé en " + duration + "s avec §c" + errors[0] + " erreur(s)§7.");
+                        world.save();
+                    }
+                    return null;
+                });
+            }
         }
     }
 
@@ -186,7 +228,19 @@ public class WorldService {
     private boolean deleteWorldFolder(File path) {
         if (path.exists()) {
             File[] files = path.listFiles();
-            if (files != null) for (File f : files) { if (f.isDirectory()) deleteWorldFolder(f); else f.delete(); }
+            if (files != null) {
+                for (File f : files) {
+                    if (f.isDirectory()) {
+                        if (!deleteWorldFolder(f)) {
+                            plugin.getLogger().warning("Impossible de supprimer le dossier: " + f.getAbsolutePath());
+                        }
+                    } else {
+                        if (!f.delete()) {
+                            plugin.getLogger().warning("Impossible de supprimer le fichier: " + f.getAbsolutePath());
+                        }
+                    }
+                }
+            }
             return path.delete();
         }
         return true;
