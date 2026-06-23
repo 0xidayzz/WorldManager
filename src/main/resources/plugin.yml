@@ -6,3 +6,21 @@ author: Oxidayzz
 commands:
   rw:
     description: Commande principale pour la gestion des mondes.
+    permission: worldmanager.use
+
+permissions:
+  worldmanager.use:
+    description: Permet d'utiliser les commandes de base (list, tp)
+    default: op
+  worldmanager.create:
+    description: Permet de creer des mondes
+    default: op
+  worldmanager.delete:
+    description: Permet de supprimer des mondes
+    default: op
+  worldmanager.pregen:
+    description: Permet de pre-generer des chunks
+    default: op
+  worldmanager.scan:
+    description: Permet de scanner les minerais
+    default: op

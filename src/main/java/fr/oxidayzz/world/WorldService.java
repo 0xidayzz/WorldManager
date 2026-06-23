@@ -23,6 +23,19 @@ public class WorldService {
         this.plugin = plugin;
     }
 
+    private boolean isSafeWorldName(String name) {
+        if (name == null || name.isEmpty()) return false;
+        if (!name.matches("[a-zA-Z0-9_\\-]+")) return false;
+        File worldDir = new File(Bukkit.getWorldContainer(), name);
+        try {
+            String canonical = worldDir.getCanonicalPath();
+            String containerCanonical = Bukkit.getWorldContainer().getCanonicalPath();
+            return canonical.startsWith(containerCanonical + File.separator);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public enum ActionType { CREATE, DELETE }
     
     public record PendingAction(String name, boolean isFlat, String biomeList, 
@@ -100,13 +113,18 @@ public class WorldService {
     }
 
     private void executeDeletion(CommandSender sender, String name) {
+        if (!isSafeWorldName(name)) {
+            sender.sendMessage("§cNom de monde invalide.");
+            return;
+        }
         World world = Bukkit.getWorld(name);
         if (world != null) {
             for (Player p : world.getPlayers()) p.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
             Bukkit.unloadWorld(world, false);
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (deleteWorldFolder(new File(Bukkit.getWorldContainer(), name))) sender.sendMessage("§aSupprimé.");
+            File target = new File(Bukkit.getWorldContainer(), name);
+            if (deleteWorldFolder(target)) sender.sendMessage("§aSupprimé.");
         }, 10L);
     }
 
@@ -184,6 +202,16 @@ public class WorldService {
     }
 
     private boolean deleteWorldFolder(File path) {
+        try {
+            String canonical = path.getCanonicalPath();
+            String containerCanonical = Bukkit.getWorldContainer().getCanonicalPath();
+            if (!canonical.startsWith(containerCanonical + File.separator)) {
+                plugin.getLogger().warning("Tentative de suppression hors du dossier serveur : " + canonical);
+                return false;
+            }
+        } catch (Exception e) {
+            return false;
+        }
         if (path.exists()) {
             File[] files = path.listFiles();
             if (files != null) for (File f : files) { if (f.isDirectory()) deleteWorldFolder(f); else f.delete(); }
