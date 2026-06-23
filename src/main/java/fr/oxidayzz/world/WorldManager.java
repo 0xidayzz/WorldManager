@@ -2,6 +2,7 @@ package fr.oxidayzz.world;
 
 import fr.oxidayzz.world.commands.WorldCommands;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -20,7 +21,9 @@ public class WorldManager extends JavaPlugin {
         if (getCommand("rw") != null) {
             WorldCommands commands = new WorldCommands(this);
             getCommand("rw").setExecutor(commands);
-            getCommand("rw").setTabCompleter(commands); // AJOUTE CETTE LIGNE
+            getCommand("rw").setTabCompleter(commands);
+        } else {
+            getLogger().severe("Commande 'rw' introuvable ! V\u00e9rifiez le plugin.yml.");
         }
 
         loadExistingWorlds();
@@ -28,18 +31,26 @@ public class WorldManager extends JavaPlugin {
     }
 
     private void loadExistingWorlds() {
-        // Liste des dossiers à ne pas charger comme des mondes
         List<String> ignore = Arrays.asList("plugins", "logs", "cache", "world", "world_nether", "world_the_end");
-        
+
         File container = Bukkit.getWorldContainer();
         File[] files = container.listFiles();
 
-        if (files != null) {
-            for (File file : files) {
-                // Si c'est un dossier qui contient un level.dat et qui n'est pas ignoré
-                if (file.isDirectory() && new File(file, "level.dat").exists() && !ignore.contains(file.getName())) {
-                    getLogger().info("Chargement automatique du monde : " + file.getName());
-                    Bukkit.createWorld(new WorldCreator(file.getName()));
+        if (files == null) {
+            getLogger().warning("Impossible de lister les dossiers dans: " + container.getAbsolutePath());
+            return;
+        }
+
+        for (File file : files) {
+            if (file.isDirectory() && new File(file, "level.dat").exists() && !ignore.contains(file.getName())) {
+                getLogger().info("Chargement automatique du monde : " + file.getName());
+                try {
+                    World world = Bukkit.createWorld(new WorldCreator(file.getName()));
+                    if (world == null) {
+                        getLogger().warning("\u00c9chec du chargement du monde : " + file.getName());
+                    }
+                } catch (Exception e) {
+                    getLogger().severe("Erreur lors du chargement du monde '" + file.getName() + "': " + e.getMessage());
                 }
             }
         }

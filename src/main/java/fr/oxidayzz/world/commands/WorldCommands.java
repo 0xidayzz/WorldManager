@@ -44,12 +44,34 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
 
             case "pregen":
                 if (args.length >= 3) {
-                    plugin.getWorldService().pregenWorld(player, args[1], Integer.parseInt(args[2]));
+                    try {
+                        int radius = Integer.parseInt(args[2]);
+                        if (radius <= 0) {
+                            player.sendMessage("§cLe rayon doit être un nombre positif.");
+                            break;
+                        }
+                        plugin.getWorldService().pregenWorld(player, args[1], radius);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage("§cLe rayon doit être un nombre valide.");
+                    }
                 } else player.sendMessage("§c/rw pregen <monde> <rayon>");
                 break;
 
             case "scan":
-                plugin.getWorldService().scanOres(player, args.length >= 2 ? Integer.parseInt(args[1]) : 1);
+                int scanRadius = 1;
+                if (args.length >= 2) {
+                    try {
+                        scanRadius = Integer.parseInt(args[1]);
+                        if (scanRadius <= 0) {
+                            player.sendMessage("§cLe rayon doit être un nombre positif.");
+                            break;
+                        }
+                    } catch (NumberFormatException e) {
+                        player.sendMessage("§cLe rayon doit être un nombre valide.");
+                        break;
+                    }
+                }
+                plugin.getWorldService().scanOres(player, scanRadius);
                 break;
 
             case "tp":
