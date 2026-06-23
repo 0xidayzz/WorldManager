@@ -18,6 +18,9 @@ import java.util.List;
 
 public class WorldCommands implements CommandExecutor, TabCompleter {
 
+    private static final int MAX_PREGEN_RADIUS = 100;
+    private static final int MAX_SCAN_RADIUS = 10;
+
     private final WorldManager plugin;
     private final List<String> subCommands = Arrays.asList("create", "delete", "tp", "confirm", "cancel", "list", "scan", "pregen");
 
@@ -32,24 +35,59 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
 
         switch (args[0].toLowerCase()) {
             case "create":
+                if (!player.hasPermission("worldmanager.create")) {
+                    player.sendMessage("§cVous n'avez pas la permission.");
+                    break;
+                }
                 if (args.length >= 9) {
                     try {
-                        plugin.getWorldService().askConfirmation(player, args[1], args[2].equalsIgnoreCase("flat"), 
+                        String worldName = args[1];
+                        if (!isValidWorldName(worldName)) {
+                            player.sendMessage("§cNom de monde invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores.");
+                            break;
+                        }
+                        plugin.getWorldService().askConfirmation(player, worldName, args[2].equalsIgnoreCase("flat"), 
                                 args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]), Integer.parseInt(args[5]), 
                                 Integer.parseInt(args[6]), Integer.parseInt(args[7]), Integer.parseInt(args[8]), 
                                 (args.length == 10 && args[9].equalsIgnoreCase("nostruct")));
-                    } catch (Exception e) { player.sendMessage("§cUsage: /rw create <nom> <biomes> <D%> <G%> <I%> <L%> <E%> <R%> [nostruct]"); }
+                    } catch (NumberFormatException e) { player.sendMessage("§cUsage: /rw create <nom> <biomes> <D%> <G%> <I%> <L%> <E%> <R%> [nostruct]"); }
                 }
                 break;
 
             case "pregen":
+                if (!player.hasPermission("worldmanager.pregen")) {
+                    player.sendMessage("§cVous n'avez pas la permission.");
+                    break;
+                }
                 if (args.length >= 3) {
-                    plugin.getWorldService().pregenWorld(player, args[1], Integer.parseInt(args[2]));
+                    try {
+                        int radius = Integer.parseInt(args[2]);
+                        if (radius < 1 || radius > MAX_PREGEN_RADIUS) {
+                            player.sendMessage("§cLe rayon doit etre entre 1 et " + MAX_PREGEN_RADIUS + ".");
+                            break;
+                        }
+                        plugin.getWorldService().pregenWorld(player, args[1], radius);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage("§cLe rayon doit etre un nombre valide.");
+                    }
                 } else player.sendMessage("§c/rw pregen <monde> <rayon>");
                 break;
 
             case "scan":
-                plugin.getWorldService().scanOres(player, args.length >= 2 ? Integer.parseInt(args[1]) : 1);
+                if (!player.hasPermission("worldmanager.scan")) {
+                    player.sendMessage("§cVous n'avez pas la permission.");
+                    break;
+                }
+                try {
+                    int radius = args.length >= 2 ? Integer.parseInt(args[1]) : 1;
+                    if (radius < 1 || radius > MAX_SCAN_RADIUS) {
+                        player.sendMessage("§cLe rayon doit etre entre 1 et " + MAX_SCAN_RADIUS + ".");
+                        break;
+                    }
+                    plugin.getWorldService().scanOres(player, radius);
+                } catch (NumberFormatException e) {
+                    player.sendMessage("§cLe rayon doit etre un nombre valide.");
+                }
                 break;
 
             case "tp":
@@ -57,7 +95,18 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
                 break;
 
             case "delete":
-                if (args.length >= 2) plugin.getWorldService().askDeleteConfirmation(player, args[1]);
+                if (!player.hasPermission("worldmanager.delete")) {
+                    player.sendMessage("§cVous n'avez pas la permission.");
+                    break;
+                }
+                if (args.length >= 2) {
+                    String worldName = args[1];
+                    if (!isValidWorldName(worldName)) {
+                        player.sendMessage("§cNom de monde invalide.");
+                        break;
+                    }
+                    plugin.getWorldService().askDeleteConfirmation(player, worldName);
+                }
                 break;
 
             case "confirm": plugin.getWorldService().confirm(player); break;
@@ -68,6 +117,10 @@ public class WorldCommands implements CommandExecutor, TabCompleter {
                 break;
         }
         return true;
+    }
+
+    private boolean isValidWorldName(String name) {
+        return name != null && name.matches("[a-zA-Z0-9_\\-]+");
     }
 
     @Override
